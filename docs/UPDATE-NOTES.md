@@ -1,0 +1,83 @@
+# RelayRx update notes
+
+## 1.3.0 — auto-drafted evidence notes
+
+- Every action dialog (verify identity/prescription, visit decision, coverage, approve, hold, release, decline, route, retry, pharmacy confirm, pickup, patient update, flag mismatch, escalate, request info) now opens with an evidence note already written from the case: patient alias, medication, pharmacy, case ID, current state, retry attempt, and the acting person's name and role.
+- Wording adapts to context, e.g. a "Missing information" identity check reads as clearing a mismatch, a "Coverage issue" case reads as a resolved administrative issue, retries say "attempt N of 3", and a manual pharmacy confirmation mentions the phone follow-up.
+- The draft is editable, nothing is saved until the person confirms, and **Reset to auto-draft** restores it. Drafts describe the action being recorded and never invent clinical facts or sources. Authorization and fulfillment remain human-controlled.
+- New sample refill dialog has **Fill with a sample patient & medication** so demo intake needs no typing.
+- No schema or API change. Validation: 60 automated tests (5 new) and production build pass.
+
+## 1.2.2 — final demo review
+
+- Standalone greetings give concise role-specific help instead of an unrelated case summary, without spending Gemini quota. Built-in replies are clearly labeled RelayRx.
+- Gemini answers focus on the actual question; drafts are produced only when requested.
+- Added `npm run check:live` for deployment routes, assets, and serverless startup, with an optional synthetic copilot check.
+- Validation: 55 automated tests, production build, and native Node API checks pass.
+
+## 1.2.1 — original demo restored on every visit
+
+- Fresh links, new tabs, and full page reloads restore the six original sample cases, names, evidence, default staff role, and 3-minute timers.
+- Demo actions remain in memory for the current document. Other tabs are isolated; legacy localStorage is ignored. Role changes and in-app navigation preserve progress.
+- Supabase case persistence is unchanged. Restart timer still resets only one presentation clock.
+- Validation: 52 tests, production build, and native Node API checks pass.
+
+This supersedes the older release notes’ browser-persisted demo history.
+
+## 1.2.0 — fresh-visit timers and resilient copilots
+
+- Each fresh page load (including refresh/new tabs) starts a new 3-minute simulation for pending cases. Session storage tracks that visit's clocks; saved case timestamps, evidence, and database records are preserved.
+- The **Restart timer** control resets only the selected case's presentation clock. Routine polling, role changes, notes, and expiry do not reset it. Human workflow progress starts the next step's timer; completed/declined cases stay stopped.
+- Queue counts, filters, Insights, all three copilots, and their snapshot checks share the same projected clock. Connected copilots still load and authorize the actual tenant-scoped case before applying the presentation-only timer.
+- Gemini receives a 30-second function budget, bounded provider timeouts, and at most one retry for transient service/network errors. The supported default model is `gemini-3.5-flash-lite`, with an environment override. Gemini 1.5 Flash is retired.
+- Provider failures, quota limits, or missing configuration return **[Offline Mode: Logic Engine Backup]**: role-specific, deterministic case guidance labeled as not AI-generated. Authentication, tenant isolation, stale-state checks, and prescribing/fulfillment boundaries still apply.
+- Safe error logs identify the failure without recording credentials or case text. No API key is committed.
+- Validation: 50 tests, production build, and native Node API checks pass.
+
+The older release notes below describe previous behavior; 1.2.0 supersedes their persisted demo-clock and error-only Gemini behavior.
+
+## 1.1.1 — Vercel runtime and sidebar fixes
+
+- Fix the `ERR_MODULE_NOT_FOUND` crash by using explicit `.js` extensions throughout both API entry points and their server dependency graph.
+- Add a native Node ESM check to the production build. It compiles and calls both handlers without Vite or a TypeScript loader, verifies controlled missing-configuration responses, and makes no provider requests.
+- Display Jordan Ellis / JE for Practice Staff, Dr. Alex Morgan / AM for Clinician, and Sam Lee / SL for Pharmacy in demo mode. Both role selectors update the same profile; connected sandbox names still come from authenticated membership.
+- Fit the sidebar to the available viewport, scroll its navigation when necessary, and reduce decorative content on shorter screens.
+- Add “Done by Chinmay Deepak Chandavar” below the sidebar profile, with a footer credit in compact layouts.
+
+Deploy the updated commit through the existing Vercel project. Keep `GEMINI_API_KEY` in Vercel's server environment; no key belongs in the repository. This import fix does not change workflow transitions, the waiting threshold, or Gemini's read-only role.
+
+## 1.1 — waiting attention and Gemini copilots
+
+This is an update to the existing six-view RelayRx application. The redstone comparator, workflow gates, role permissions, patient update previews, audit trail, failure simulation, optional Supabase mode, and growth playbook are preserved.
+
+## Changes
+
+- Persist a per-case `waitingSince` timestamp for the current required action.
+- Derive Needs Attention after 180 seconds while an action remains pending. Three minutes = 30 simulated hours.
+- Update the existing metric/filter, queue rows, detail banner, Insights, and read-only inspection context.
+- Reset the wait when the current step advances. Stop it for confirmed pickup or decline. Drafts, viewing, failed retries, and escalation do not dismiss an unresolved wait.
+- Keep attention separate from workflow status, readiness, evidence, and completion. No timer changes workflow records.
+- Add a round draggable chatbot with separate Practice Staff, Clinician, and Pharmacy Gemini contexts and conversation threads.
+- Send actual case state, attention, owner, next action, and verified/missing information. Hide stale guidance and reject responses if the snapshot changes.
+- Keep Gemini server-side and read-only. The API never writes case state or invokes clinical/workflow actions.
+- Run both API handlers locally through the existing Vite development command; keep Vercel/Git deployment settings.
+
+The earlier delivered source did not include a Gemini endpoint. This update adds the shared Gemini integration in place; it does not replace an existing provider or rebuild the app.
+
+## Existing data
+
+Browser-local cases retain their evidence and history. On first upgrade, old cases without a waiting timestamp receive one fresh, persisted demo waiting period. Resolved and declined cases have no active timer. Reloading again does not restart that period.
+
+Connected cases use the existing JSON payload column, so no database schema migration is required. Legacy cases derive their waiting start from their last progress event or creation time; the next action stores the new field. Connected roles are derived from verified membership, with tenant-scoped case reads and a latest-state check after model completion.
+
+## Validation
+
+- 31 tests pass, including the original workflow, comparator, API, and embedded PostgreSQL tests.
+- Production TypeScript/Vite build passes.
+- Real three-minute browser check verifies that the attention count rises while a 15/15 routed case stays Awaiting Pharmacy.
+- Browser checks cover the attention filter, role panels, continued pharmacy workflow, actual pickup confirmation, stopped timer, and movable launcher.
+- Gemini requests are tested using mocks. A live Gemini answer, real Supabase Auth, and a hosted Vercel deployment require your configured services.
+
+## Configure
+
+See [GEMINI-SETUP.md](../GEMINI-SETUP.md). Add `GEMINI_API_KEY` to `.env.local` for local use, or Vercel Project Settings → Environment Variables for deployment, then restart or redeploy. Never use a `VITE_` prefix for the key and never commit it to Git.
